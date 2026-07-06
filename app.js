@@ -29,6 +29,11 @@
   gateBtn.addEventListener("click", tryUnlock);
   gateInput.addEventListener("keydown", e => { if (e.key === "Enter") tryUnlock(); });
 
+  document.getElementById("btn-logout").addEventListener("click", () => {
+    localStorage.removeItem("dvc_unlocked");
+    location.reload();
+  });
+
   // ---------- CSV parsing ----------
   function parseCsv(text) {
     const rows = [];
@@ -111,7 +116,22 @@
 
   // ---------- Data load ----------
   let DATA = [];
+  let segmentColors = new Map();
+  const PALETTE = ["#d4930f", "#8b5cf6", "#16a34a", "#06b6d4", "#db2777", "#f97316", "#dc2626", "#4f46e5", "#64748b"];
+  const TOTAL_COLOR = "#0ea5b8";
   const statusEl = document.getElementById("status");
+
+  function buildSegmentColors(rows) {
+    const sums = new Map();
+    rows.forEach(r => {
+      const key = r.segmento || "(sin dato)";
+      sums.set(key, (sums.get(key) || 0) + (r.cant || 0));
+    });
+    const ordered = Array.from(sums.entries()).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+    const map = new Map();
+    ordered.forEach((name, i) => map.set(name, PALETTE[i % PALETTE.length]));
+    return map;
+  }
 
   function loadData() {
     statusEl.textContent = "Cargando datos...";
@@ -123,6 +143,7 @@
       })
       .then(text => {
         DATA = rowsFromCsv(text);
+        segmentColors = buildSegmentColors(DATA);
         if (DATA.length === 0) {
           statusEl.textContent = "La hoja no tiene filas con PILAR = VALUE_CREATION.";
           statusEl.className = "status status-error";
@@ -131,7 +152,8 @@
           statusEl.className = "status";
         }
         const maxDia = DATA.reduce((m, r) => r.dia > m ? r.dia : m, "");
-        document.getElementById("updatedAt").textContent = "Datos al dia: " + (maxDia || "-") + " (" + DATA.length + " tareas)";
+        document.getElementById("badge-updated").textContent = "📅 Datos al dia: " + (maxDia || "-");
+        document.getElementById("badge-count").textContent = fmtInt(DATA.length) + " registros";
         populateFilters();
         render();
       })
@@ -144,16 +166,17 @@
   document.getElementById("btn-refresh").addEventListener("click", loadData);
 
   // ---------- Filters ----------
-  const FILTER_FIELDS = [
-    { id: "f-dia", field: "dia" },
-    { id: "f-business", field: "business" },
-    { id: "f-canal", field: "canal" },
-    { id: "f-distribuidor", field: "distribuidor" },
-    { id: "f-supervisor", field: "supervisor" },
-    { id: "f-promotor", field: "promotor" }
+  const ALL_FILTERS = [
+    { field: "dia", label: "Dia", id: "f-dia", kind: "select" },
+    { field: "distribuidor", label: "Distribuidor", id: "f-distribuidor", kind: "select" },
+    { field: "supervisor", label: "Supervisor", id: "f-supervisor", kind: "select" },
+    { field: "promotor", label: "Promotor", id: "f-promotor", kind: "select" },
+    { field: "canal", label: "Canal", id: "f-canal", kind: "select" },
+    { field: "business", label: "Negocio", kind: "chip" },
+    { field: "segmento", label: "Segmento", kind: "card" }
   ];
   const state = {};
-  FILTER_FIELDS.forEach(f => state[f.field] = "TODOS");
+  ALL_FILTERS.forEach(f => state[f.field] = "TODOS");
 
   function uniqueSorted(arr, field) {
     return Array.from(new Set(arr.map(r => r[field]).filter(v => v))).sort((a, b) => String(a).localeCompare(String(b)));
@@ -165,7 +188,7 @@
 
   let filtersBuilt = false;
   function populateFilters() {
-    FILTER_FIELDS.forEach(f => {
+    ALL_FILTERS.filter(f => f.kind === "select").forEach(f => {
       const sel = document.getElementById(f.id);
       const current = state[f.field];
       const values = uniqueSorted(DATA, f.field);
@@ -173,26 +196,48 @@
       sel.value = values.includes(current) ? current : "TODOS";
       state[f.field] = sel.value;
     });
+
+    const businessValues = uniqueSorted(DATA, "business");
+    const chipHost = document.getElementById("f-business-chips");
+    chipHost.innerHTML = businessValues.map(v =>
+      `<button type="button" class="chip" data-value="${escapeHtml(v)}">${escapeHtml(v)}</button>`
+    ).join("");
+    chipHost.querySelectorAll(".chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const v = btn.getAttribute("data-value");
+        state.business = (state.business === v) ? "TODOS" : v;
+        render();
+      });
+    });
+
     if (!filtersBuilt) {
       filtersBuilt = true;
-      FILTER_FIELDS.forEach(f => {
+      ALL_FILTERS.filter(f => f.kind === "select").forEach(f => {
         document.getElementById(f.id).addEventListener("change", (e) => {
           state[f.field] = e.target.value;
           render();
         });
       });
       document.getElementById("btn-reset").addEventListener("click", () => {
-        FILTER_FIELDS.forEach(f => {
+        ALL_FILTERS.forEach(f => {
           state[f.field] = "TODOS";
-          document.getElementById(f.id).value = "TODOS";
+          if (f.kind === "select") document.getElementById(f.id).value = "TODOS";
         });
         render();
       });
     }
   }
 
+  function matchesAllExcept(r, exceptField) {
+    return ALL_FILTERS.every(f => f.field === exceptField || state[f.field] === "TODOS" || r[f.field] === state[f.field]);
+  }
+
   function getFiltered() {
-    return DATA.filter(r => FILTER_FIELDS.every(f => state[f.field] === "TODOS" || r[f.field] === state[f.field]));
+    return DATA.filter(r => matchesAllExcept(r, null));
+  }
+
+  function getFilteredExcept(exceptField) {
+    return DATA.filter(r => matchesAllExcept(r, exceptField));
   }
 
   function sumBy(rows, key) { return rows.reduce((acc, r) => acc + (r[key] || 0), 0); }
@@ -285,25 +330,76 @@
     });
   }
 
+  function renderSegmentCards() {
+    const rows = getFilteredExcept("segmento");
+    const cant = sumBy(rows, "cant"), val = sumBy(rows, "val");
+    const bySegmento = groupBy(rows, "segmento").slice().sort((a, b) => b.cant - a.cant);
+
+    const cardsData = [
+      { name: "Total", key: "TODOS", color: TOTAL_COLOR, cant, val, pctVal: pct(val, cant) }
+    ].concat(bySegmento.map(s => ({
+      name: s.name, key: s.name, color: segmentColors.get(s.name) || "#64748b",
+      cant: s.cant, val: s.val, pctVal: s.pctVal
+    })));
+
+    document.getElementById("segment-cards").innerHTML = cardsData.map(c => {
+      const active = state.segmento === c.key;
+      return `<div class="segment-card${active ? " active" : ""}" style="--seg-color:${c.color}" data-key="${escapeHtml(c.key)}">
+        <div class="segment-label">${active ? "&#10003; " : ""}${escapeHtml(c.name)}</div>
+        <div class="segment-value">${fmtPct(c.pctVal)}</div>
+        <div class="segment-caption">% Validadas &middot; ${fmtInt(c.cant)} tareas</div>
+      </div>`;
+    }).join("");
+
+    document.querySelectorAll("#segment-cards .segment-card").forEach(el => {
+      el.addEventListener("click", () => {
+        const key = el.getAttribute("data-key");
+        state.segmento = (state.segmento === key) ? "TODOS" : key;
+        render();
+      });
+    });
+  }
+
+  const FILTER_TAG_LABELS = { dia: "Dia", distribuidor: "Dist", supervisor: "Sup", promotor: "Prom", canal: "Canal", business: "Negocio", segmento: "Segmento" };
+  function renderActiveTags() {
+    const active = ALL_FILTERS.filter(f => state[f.field] !== "TODOS");
+    document.getElementById("filters-count").textContent = active.length;
+    document.getElementById("active-tags").innerHTML = active.map(f =>
+      `<span class="tag">${FILTER_TAG_LABELS[f.field]}: ${escapeHtml(state[f.field])} <button type="button" data-field="${f.field}">&times;</button></span>`
+    ).join("");
+    document.querySelectorAll("#active-tags .tag button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const field = btn.getAttribute("data-field");
+        state[field] = "TODOS";
+        const sel = document.getElementById("f-" + field);
+        if (sel) sel.value = "TODOS";
+        render();
+      });
+    });
+    document.querySelectorAll("#f-business-chips .chip").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-value") === state.business);
+    });
+  }
+
   function render() {
     const rows = getFiltered();
     renderKpis(rows);
+    renderActiveTags();
+    renderSegmentCards();
+
     const byPromotor = groupBy(rows, "promotor");
     const bySupervisor = groupBy(rows, "supervisor");
     const byDistribuidor = groupBy(rows, "distribuidor");
-    const bySegmento = groupBy(rows, "segmento");
     const byTarea = groupBy(rows, "tarea");
 
     renderTable("table-promotor", byPromotor, { nameLabel: "Promotor" });
     renderTable("table-supervisor", bySupervisor, { nameLabel: "Supervisor" });
     renderTable("table-distribuidor", byDistribuidor, { nameLabel: "Distribuidor" });
-    renderTable("table-segmento", bySegmento, { nameLabel: "Segmento" });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
 
     renderChart("chart-promotor", byPromotor, 15);
     renderChart("chart-supervisor", bySupervisor);
     renderChart("chart-distribuidor", byDistribuidor);
-    renderChart("chart-segmento", bySegmento);
   }
 
   // ---------- Init (al final, ya que todo lo anterior esta definido) ----------
