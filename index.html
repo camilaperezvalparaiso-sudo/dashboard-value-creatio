@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Dashboard Value Creation</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="gate" class="gate">
+  <div class="gate-box">
+    <h2>Dashboard Value Creation</h2>
+    <p>Ingres&aacute; la clave de acceso.</p>
+    <input type="password" id="gate-input" placeholder="Clave" autofocus>
+    <button id="gate-btn">Entrar</button>
+    <div class="gate-error" id="gate-error"></div>
+  </div>
+</div>
+
+<div id="app" class="app-hidden">
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>Dashboard Value Creation</h1>
+      <span class="subtitle">Seguimiento diario de tareas &mdash; PILAR: Value Creation</span>
+    </div>
+    <div class="topbar-updated" id="updatedAt"></div>
+  </header>
+
+  <section class="filters" id="filters">
+    <div class="filter-group">
+      <label for="f-dia">D&iacute;a</label>
+      <select id="f-dia"></select>
+    </div>
+    <div class="filter-group">
+      <label for="f-business">Negocio</label>
+      <select id="f-business"></select>
+    </div>
+    <div class="filter-group">
+      <label for="f-canal">Canal</label>
+      <select id="f-canal"></select>
+    </div>
+    <div class="filter-group">
+      <label for="f-distribuidor">Distribuidor</label>
+      <select id="f-distribuidor"></select>
+    </div>
+    <div class="filter-group">
+      <label for="f-supervisor">Supervisor</label>
+      <select id="f-supervisor"></select>
+    </div>
+    <div class="filter-group">
+      <label for="f-promotor">Promotor</label>
+      <select id="f-promotor"></select>
+    </div>
+    <button id="btn-reset">Limpiar filtros</button>
+    <button id="btn-refresh">Actualizar datos</button>
+  </section>
+
+  <div id="status" class="status"></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="charts-grid">
+    <div class="card chart-card">
+      <h2>Ranking % Validada por Promotor</h2>
+      <canvas id="chart-promotor"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h2>Ranking % Validada por Supervisor</h2>
+      <canvas id="chart-supervisor"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h2>Ranking % Validada por Distribuidor</h2>
+      <canvas id="chart-distribuidor"></canvas>
+    </div>
+    <div class="card chart-card">
+      <h2>Ranking % Validada por Segmento (Pilar)</h2>
+      <canvas id="chart-segmento"></canvas>
+    </div>
+  </section>
+
+  <section class="tables-grid">
+    <div class="card table-card">
+      <h2>Detalle por Promotor</h2>
+      <div class="table-scroll" id="table-promotor"></div>
+    </div>
+    <div class="card table-card">
+      <h2>Detalle por Supervisor</h2>
+      <div class="table-scroll" id="table-supervisor"></div>
+    </div>
+    <div class="card table-card">
+      <h2>Detalle por Distribuidor</h2>
+      <div class="table-scroll" id="table-distribuidor"></div>
+    </div>
+    <div class="card table-card">
+      <h2>Detalle por Segmento</h2>
+      <div class="table-scroll" id="table-segmento"></div>
+    </div>
+    <div class="card table-card table-card-wide">
+      <h2>Ranking de Tareas (m&aacute;s y menos validadas)</h2>
+      <div class="table-scroll table-scroll-tall" id="table-tarea"></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    Dashboard en vivo: lee la base directamente desde la Google Sheet publicada. Alcance: solo tareas PILAR = VALUE_CREATION.
+  </footer>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
