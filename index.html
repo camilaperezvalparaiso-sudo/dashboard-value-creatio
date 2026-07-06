@@ -37,9 +37,13 @@
     <div class="filters-row">
       <span class="filters-label">FILTROS GLOBALES <span class="filters-count" id="filters-count">0</span></span>
 
-      <div class="filter-pill">
-        <label>D&iacute;a</label>
-        <select id="f-dia"></select>
+      <div class="filter-pill filter-pill-daterange">
+        <label>Per&iacute;odo</label>
+        <div class="daterange">
+          <input type="date" id="f-dia-desde" title="Desde">
+          <span>&rarr;</span>
+          <input type="date" id="f-dia-hasta" title="Hasta">
+        </div>
       </div>
       <div class="filter-pill">
         <label>Distribuidor</label>
@@ -82,7 +86,7 @@
 
   <section class="charts-grid">
     <div class="card chart-card">
-      <h2>Ranking % Validada por Promotor</h2>
+      <h2>Ranking % Validada por Promotor <span class="hint">(barra llena = objetivo del mes)</span></h2>
       <div class="rankbar-list" id="rank-promotor"></div>
     </div>
     <div class="card chart-card">

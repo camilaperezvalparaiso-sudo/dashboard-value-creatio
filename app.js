@@ -167,7 +167,7 @@
 
   // ---------- Filters ----------
   const ALL_FILTERS = [
-    { field: "dia", label: "Dia", id: "f-dia", kind: "select" },
+    { field: "dia", label: "Dia", kind: "daterange" },
     { field: "distribuidor", label: "Distribuidor", id: "f-distribuidor", kind: "select" },
     { field: "supervisor", label: "Supervisor", id: "f-supervisor", kind: "select" },
     { field: "promotor", label: "Promotor", id: "f-promotor", kind: "select" },
@@ -175,8 +175,18 @@
     { field: "business", label: "Negocio", kind: "chip" },
     { field: "segmento", label: "Segmento", kind: "card" }
   ];
-  const state = {};
-  ALL_FILTERS.forEach(f => state[f.field] = "TODOS");
+  const state = { diaDesde: "", diaHasta: "" };
+  ALL_FILTERS.forEach(f => { if (f.kind !== "daterange") state[f.field] = "TODOS"; });
+
+  function ymdToInputDate(ymd) {
+    if (!ymd || ymd.length !== 8) return "";
+    return ymd.slice(0, 4) + "-" + ymd.slice(4, 6) + "-" + ymd.slice(6, 8);
+  }
+  function inputDateToYmd(v) { return v ? v.replace(/-/g, "") : ""; }
+  function fmtDiaDisplay(ymd) {
+    if (!ymd || ymd.length !== 8) return ymd;
+    return ymd.slice(6, 8) + "/" + ymd.slice(4, 6) + "/" + ymd.slice(0, 4);
+  }
 
   function uniqueSorted(arr, field) {
     return Array.from(new Set(arr.map(r => r[field]).filter(v => v))).sort((a, b) => String(a).localeCompare(String(b)));
@@ -196,6 +206,14 @@
       sel.value = values.includes(current) ? current : "TODOS";
       state[f.field] = sel.value;
     });
+
+    const dias = uniqueSorted(DATA, "dia");
+    if (dias.length) {
+      const minD = ymdToInputDate(dias[0]), maxD = ymdToInputDate(dias[dias.length - 1]);
+      const desdeEl = document.getElementById("f-dia-desde"), hastaEl = document.getElementById("f-dia-hasta");
+      desdeEl.min = minD; desdeEl.max = maxD;
+      hastaEl.min = minD; hastaEl.max = maxD;
+    }
 
     const businessValues = uniqueSorted(DATA, "business");
     const chipHost = document.getElementById("f-business-chips");
@@ -218,18 +236,36 @@
           render();
         });
       });
+      document.getElementById("f-dia-desde").addEventListener("change", (e) => {
+        state.diaDesde = inputDateToYmd(e.target.value);
+        render();
+      });
+      document.getElementById("f-dia-hasta").addEventListener("change", (e) => {
+        state.diaHasta = inputDateToYmd(e.target.value);
+        render();
+      });
       document.getElementById("btn-reset").addEventListener("click", () => {
         ALL_FILTERS.forEach(f => {
-          state[f.field] = "TODOS";
-          if (f.kind === "select") document.getElementById(f.id).value = "TODOS";
+          if (f.kind === "select") { state[f.field] = "TODOS"; document.getElementById(f.id).value = "TODOS"; }
+          else if (f.kind !== "daterange") { state[f.field] = "TODOS"; }
         });
+        state.diaDesde = ""; state.diaHasta = "";
+        document.getElementById("f-dia-desde").value = "";
+        document.getElementById("f-dia-hasta").value = "";
         render();
       });
     }
   }
 
   function matchesAllExcept(r, exceptField) {
-    return ALL_FILTERS.every(f => f.field === exceptField || state[f.field] === "TODOS" || r[f.field] === state[f.field]);
+    if (exceptField !== "dia") {
+      if (state.diaDesde && r.dia < state.diaDesde) return false;
+      if (state.diaHasta && r.dia > state.diaHasta) return false;
+    }
+    return ALL_FILTERS.every(f => {
+      if (f.kind === "daterange" || f.field === exceptField) return true;
+      return state[f.field] === "TODOS" || r[f.field] === state[f.field];
+    });
   }
 
   function getFiltered() {
@@ -310,11 +346,27 @@
     return "#16a34a";
   }
 
-  function renderRankBars(containerId, rows, limit) {
+  function tokenSet(s) { return new Set(String(s).toUpperCase().trim().split(/\s+/).filter(Boolean)); }
+  function sameTokens(a, b) {
+    const A = tokenSet(a), B = tokenSet(b);
+    if (A.size !== B.size) return false;
+    for (const t of A) if (!B.has(t)) return false;
+    return true;
+  }
+  function getPromotorTarget(name) {
+    const overrides = CFG.PROMOTOR_TARGET_OVERRIDES || {};
+    for (const key in overrides) {
+      if (sameTokens(key, name)) return overrides[key];
+    }
+    return CFG.PROMOTOR_TARGET_DEFAULT != null ? CFG.PROMOTOR_TARGET_DEFAULT : 1;
+  }
+
+  function renderRankBars(containerId, rows, limit, targetFn) {
     const shown = rows.slice(0, limit || rows.length);
     const html = shown.map((r, i) => {
       const color = semaforoColor(r.pctVal);
-      const width = Math.max(2, Math.min(100, r.pctVal * 100));
+      const target = targetFn ? targetFn(r.name) : 1;
+      const width = Math.max(2, Math.min(100, (r.pctVal / target) * 100));
       return `<div class="rankbar">
         <div class="rankbar-pos">${i + 1}</div>
         <div class="rankbar-body">
@@ -339,9 +391,12 @@
       cant: s.cant, val: s.val, pctVal: s.pctVal
     })));
 
+    const hasSelection = state.segmento !== "TODOS";
     document.getElementById("segment-cards").innerHTML = cardsData.map(c => {
       const active = state.segmento === c.key;
-      return `<div class="segment-card${active ? " active" : ""}" style="--seg-color:${c.color}" data-key="${escapeHtml(c.key)}">
+      const dimmed = hasSelection && !active;
+      const cls = "segment-card" + (active ? " active" : "") + (dimmed ? " dimmed" : "");
+      return `<div class="${cls}" style="--seg-color:${c.color}" data-key="${escapeHtml(c.key)}">
         <div class="segment-label">${active ? "&#10003; " : ""}${escapeHtml(c.name)}</div>
         <div class="segment-value">${fmtPct(c.pctVal)}</div>
         <div class="segment-caption">% Validadas &middot; ${fmtInt(c.cant)} tareas</div>
@@ -357,19 +412,36 @@
     });
   }
 
-  const FILTER_TAG_LABELS = { dia: "Dia", distribuidor: "Dist", supervisor: "Sup", promotor: "Prom", canal: "Canal", business: "Negocio", segmento: "Segmento" };
+  const FILTER_TAG_LABELS = { dia: "Periodo", distribuidor: "Dist", supervisor: "Sup", promotor: "Prom", canal: "Canal", business: "Negocio", segmento: "Segmento" };
   function renderActiveTags() {
-    const active = ALL_FILTERS.filter(f => state[f.field] !== "TODOS");
-    document.getElementById("filters-count").textContent = active.length;
-    document.getElementById("active-tags").innerHTML = active.map(f =>
+    const simpleActive = ALL_FILTERS.filter(f => f.kind !== "daterange" && state[f.field] !== "TODOS");
+    const diaActive = !!(state.diaDesde || state.diaHasta);
+    document.getElementById("filters-count").textContent = simpleActive.length + (diaActive ? 1 : 0);
+
+    let tagsHtml = "";
+    if (diaActive) {
+      const label = state.diaDesde && state.diaHasta
+        ? fmtDiaDisplay(state.diaDesde) + " &rarr; " + fmtDiaDisplay(state.diaHasta)
+        : state.diaDesde ? "desde " + fmtDiaDisplay(state.diaDesde) : "hasta " + fmtDiaDisplay(state.diaHasta);
+      tagsHtml += `<span class="tag">${FILTER_TAG_LABELS.dia}: ${label} <button type="button" data-field="dia">&times;</button></span>`;
+    }
+    tagsHtml += simpleActive.map(f =>
       `<span class="tag">${FILTER_TAG_LABELS[f.field]}: ${escapeHtml(state[f.field])} <button type="button" data-field="${f.field}">&times;</button></span>`
     ).join("");
+    document.getElementById("active-tags").innerHTML = tagsHtml;
+
     document.querySelectorAll("#active-tags .tag button").forEach(btn => {
       btn.addEventListener("click", () => {
         const field = btn.getAttribute("data-field");
-        state[field] = "TODOS";
-        const sel = document.getElementById("f-" + field);
-        if (sel) sel.value = "TODOS";
+        if (field === "dia") {
+          state.diaDesde = ""; state.diaHasta = "";
+          document.getElementById("f-dia-desde").value = "";
+          document.getElementById("f-dia-hasta").value = "";
+        } else {
+          state[field] = "TODOS";
+          const sel = document.getElementById("f-" + field);
+          if (sel) sel.value = "TODOS";
+        }
         render();
       });
     });
@@ -394,7 +466,7 @@
     renderTable("table-distribuidor", byDistribuidor, { nameLabel: "Distribuidor" });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
 
-    renderRankBars("rank-promotor", byPromotor, 15);
+    renderRankBars("rank-promotor", byPromotor, 15, getPromotorTarget);
     renderRankBars("rank-supervisor", bySupervisor);
     renderRankBars("rank-distribuidor", byDistribuidor);
   }
