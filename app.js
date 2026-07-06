@@ -81,6 +81,14 @@
     for (let r = 1; r < table.length; r++) {
       const row = table[r];
       if (!row || row[idx.PILAR] !== "VALUE_CREATION") continue;
+      const tarea = row[idx.TAREA] || "";
+      const val = num(row[idx.TAREAS_VALIDADAS]);
+
+      // Tareas *BONUS*: si no estan validadas, no cuentan como enviadas (se excluyen
+      // del todo); si estan validadas, cuentan como enviadas y validadas normalmente.
+      const isBonus = /BONUS/i.test(tarea);
+      if (isBonus && val !== 1) continue;
+
       out.push({
         dia: row[idx.dia] || "",
         promotor: row[idx.PROMOTOR] || "",
@@ -89,10 +97,10 @@
         business: row[idx.BUSINESS] || "",
         canal: row[idx.CANAL] || "",
         segmento: row[idx.SEGMENTO] || "",
-        tarea: row[idx.TAREA] || "",
+        tarea: tarea,
         cant: num(row[idx.CANTIDAD_TAREAS]),
         comp: num(row[idx.TAREAS_COMPLETADAS]),
-        val: num(row[idx.TAREAS_VALIDADAS]),
+        val: val,
         compNoVal: num(row[idx.TAREAS_COMPLETADAS_NO_VALIDADAS]),
         bultosEsp: num(row[idx.bultos_esperado]),
         bultosVal: num(row[idx.bultos_validado])
