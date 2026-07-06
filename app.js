@@ -247,13 +247,12 @@
 
   function renderKpis(rows) {
     const cant = sumBy(rows, "cant"), comp = sumBy(rows, "comp"), val = sumBy(rows, "val"),
-      compNoVal = sumBy(rows, "compNoVal"), bultosEsp = sumBy(rows, "bultosEsp"), bultosVal = sumBy(rows, "bultosVal");
+      compNoVal = sumBy(rows, "compNoVal");
     const cards = [
       { label: "Tareas (Value Creation)", value: fmtInt(cant) },
       { label: "% Completadas", value: fmtPct(pct(comp, cant)) },
       { label: "% Validadas", value: fmtPct(pct(val, cant)) },
-      { label: "% Completadas no validadas", value: fmtPct(pct(compNoVal, comp)) },
-      { label: "% Bultos validados", value: fmtPct(pct(bultosVal, bultosEsp)) }
+      { label: "% Completadas no validadas", value: fmtPct(pct(compNoVal, comp)) }
     ];
     document.getElementById("kpis").innerHTML = cards.map(c =>
       `<div class="kpi-card"><div class="kpi-label">${c.label}</div><div class="kpi-value">${c.value}</div></div>`
@@ -305,29 +304,27 @@
     document.getElementById(containerId).innerHTML = html;
   }
 
-  const charts = {};
-  function renderChart(canvasId, rows, limit) {
+  function semaforoColor(p) {
+    if (p < 0.33) return "#dc2626";
+    if (p < 0.66) return "#e6b800";
+    return "#16a34a";
+  }
+
+  function renderRankBars(containerId, rows, limit) {
     const shown = rows.slice(0, limit || rows.length);
-    const ctx = document.getElementById(canvasId).getContext("2d");
-    const labels = shown.map(r => r.name);
-    const values = shown.map(r => +(r.pctVal * 100).toFixed(1));
-    const colors = shown.map(r => colorForPct(r.pctVal).replace("0.25", "0.8"));
-    if (charts[canvasId]) {
-      charts[canvasId].data.labels = labels;
-      charts[canvasId].data.datasets[0].data = values;
-      charts[canvasId].data.datasets[0].backgroundColor = colors;
-      charts[canvasId].update();
-      return;
-    }
-    charts[canvasId] = new Chart(ctx, {
-      type: "bar",
-      data: { labels, datasets: [{ label: "% Validada", data: values, backgroundColor: colors }] },
-      options: {
-        indexAxis: "y", responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" } } }
-      }
-    });
+    const html = shown.map((r, i) => {
+      const color = semaforoColor(r.pctVal);
+      const width = Math.max(2, Math.min(100, r.pctVal * 100));
+      return `<div class="rankbar">
+        <div class="rankbar-pos">${i + 1}</div>
+        <div class="rankbar-body">
+          <div class="rankbar-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</div>
+          <div class="rankbar-track"><div class="rankbar-fill" style="width:${width}%;background:${color}"></div></div>
+        </div>
+        <div class="rankbar-pct" style="color:${color}">${fmtPct(r.pctVal)}</div>
+      </div>`;
+    }).join("");
+    document.getElementById(containerId).innerHTML = html;
   }
 
   function renderSegmentCards() {
@@ -397,9 +394,9 @@
     renderTable("table-distribuidor", byDistribuidor, { nameLabel: "Distribuidor" });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
 
-    renderChart("chart-promotor", byPromotor, 15);
-    renderChart("chart-supervisor", bySupervisor);
-    renderChart("chart-distribuidor", byDistribuidor);
+    renderRankBars("rank-promotor", byPromotor, 15);
+    renderRankBars("rank-supervisor", bySupervisor);
+    renderRankBars("rank-distribuidor", byDistribuidor);
   }
 
   // ---------- Init (al final, ya que todo lo anterior esta definido) ----------
