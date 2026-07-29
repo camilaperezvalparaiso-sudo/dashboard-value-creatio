@@ -67,6 +67,13 @@
     return isNaN(n) ? 0 : n;
   }
 
+  function onlyDigits(v) { return String(v || "").replace(/\D/g, ""); }
+  function normalizeText(s) { return String(s || "").trim().replace(/\s+/g, " ").toUpperCase(); }
+  function normalizeSku(v) {
+    const d = onlyDigits(v);
+    return d ? String(parseInt(d, 10)) : normalizeText(v);
+  }
+
   function rowsFromCsv(text) {
     const table = parseCsv(text);
     if (table.length < 2) return [];
@@ -74,9 +81,9 @@
     const idx = {};
     headers.forEach((h, i) => idx[h] = i);
 
-    const need = ["PILAR", "dia", "PROMOTOR", "supervisor", "desc_ddc_wh", "BUSINESS", "CANAL",
+    const need = ["PILAR", "dia", "PROMOTOR", "supervisor", "desc_ddc_wh", "cod_ddc_wh", "BUSINESS", "CANAL",
       "SEGMENTO", "TAREA", "CANTIDAD_TAREAS", "TAREAS_COMPLETADAS", "TAREAS_VALIDADAS",
-      "TAREAS_COMPLETADAS_NO_VALIDADAS", "bultos_esperado", "bultos_validado"];
+      "TAREAS_COMPLETADAS_NO_VALIDADAS", "bultos_esperado", "bultos_validado", "cliente_id"];
     const missing = need.filter(h => !(h in idx));
     if (missing.length) {
       throw new Error("Faltan columnas en la hoja: " + missing.join(", "));
@@ -99,6 +106,8 @@
         promotor: row[idx.PROMOTOR] || "",
         supervisor: row[idx.supervisor] || "",
         distribuidor: row[idx.desc_ddc_wh] || "",
+        codDdcWh: onlyDigits(row[idx.cod_ddc_wh]),
+        clienteId: onlyDigits(row[idx.cliente_id]),
         business: row[idx.BUSINESS] || "",
         canal: row[idx.CANAL] || "",
         segmento: row[idx.SEGMENTO] || "",
@@ -108,10 +117,76 @@
         val: val,
         compNoVal: num(row[idx.TAREAS_COMPLETADAS_NO_VALIDADAS]),
         bultosEsp: num(row[idx.bultos_esperado]),
-        bultosVal: num(row[idx.bultos_validado])
+        bultosVal: num(row[idx.bultos_validado]),
+        preValNum: 0,
+        preValDenom: 0
       });
     }
     return out;
+  }
+
+  // ---------- SKU validacion + venta (pre-validacion) ----------
+  function parseSkuValidacion(text) {
+    const table = parseCsv(text);
+    if (table.length < 2) return new Map();
+    const headers = table[0].map(h => h.trim());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    if (!("full_description" in idx) || !("sku_id" in idx)) {
+      throw new Error("La hoja de SKU validacion necesita las columnas full_description y sku_id");
+    }
+    const map = new Map();
+    for (let r = 1; r < table.length; r++) {
+      const row = table[r];
+      if (!row) continue;
+      const key = normalizeText(row[idx.full_description]);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, new Set());
+      map.get(key).add(normalizeSku(row[idx.sku_id]));
+    }
+    return map;
+  }
+
+  function parseVenta(text, codDdcWh) {
+    const table = parseCsv(text);
+    if (table.length < 2) return new Map();
+    const headers = table[0].map(h => h.trim());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    const req = ["Código Cliente", "Código Producto", "Cantidad Total en Bultos"];
+    const missing = req.filter(h => !(h in idx));
+    if (missing.length) {
+      throw new Error("La hoja de venta necesita las columnas: " + missing.join(", "));
+    }
+    const map = new Map();
+    for (let r = 1; r < table.length; r++) {
+      const row = table[r];
+      if (!row) continue;
+      const bultos = num(row[idx["Cantidad Total en Bultos"]]);
+      if (bultos <= 0) continue; // negativo o cero = devolucion, no cuenta
+      const clientCode = onlyDigits(row[idx["Código Cliente"]]);
+      if (!clientCode) continue;
+      const fullClienteId = codDdcWh + clientCode.padStart(8, "0");
+      const sku = normalizeSku(row[idx["Código Producto"]]);
+      if (!map.has(fullClienteId)) map.set(fullClienteId, new Set());
+      map.get(fullClienteId).add(sku);
+    }
+    return map;
+  }
+
+  function applyPreValidacion(tasks, skuMap, purchaseMap) {
+    tasks.forEach(t => {
+      const validSkus = skuMap.get(normalizeText(t.tarea));
+      if (!validSkus || validSkus.size === 0) {
+        t.preValDenom = 0;
+        t.preValNum = 0;
+        return;
+      }
+      const purchased = purchaseMap.get(t.clienteId);
+      const matched = !!purchased && Array.from(validSkus).some(sku => purchased.has(sku));
+      t.preValDenom = t.cant;
+      t.preValNum = matched ? t.cant : 0;
+    });
   }
 
   // ---------- Data load ----------
@@ -133,34 +208,55 @@
     return map;
   }
 
+  function fetchText(url) {
+    return fetch(url, { cache: "no-store" }).then(res => {
+      if (!res.ok) throw new Error("HTTP " + res.status + " (" + url + ")");
+      return res.text();
+    });
+  }
+
   function loadData() {
     statusEl.textContent = "Cargando datos...";
     statusEl.className = "status status-loading";
-    fetch(CFG.SHEET_CSV_URL, { cache: "no-store" })
-      .then(res => {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.text();
-      })
-      .then(text => {
-        DATA = rowsFromCsv(text);
-        segmentColors = buildSegmentColors(DATA);
-        if (DATA.length === 0) {
-          statusEl.textContent = "La hoja no tiene filas con PILAR = VALUE_CREATION.";
-          statusEl.className = "status status-error";
-        } else {
-          statusEl.textContent = "";
-          statusEl.className = "status";
-        }
-        const maxDia = DATA.reduce((m, r) => r.dia > m ? r.dia : m, "");
-        document.getElementById("badge-updated").textContent = "📅 Datos al dia: " + (maxDia || "-");
-        document.getElementById("badge-count").textContent = fmtInt(DATA.length) + " registros";
-        populateFilters();
-        render();
-      })
-      .catch(err => {
-        statusEl.textContent = "No se pudo cargar la base: " + err.message;
-        statusEl.className = "status status-error";
+
+    const ventaSources = CFG.VENTA_SOURCES || [];
+
+    Promise.all([
+      fetchText(CFG.SHEET_TASKS_CSV_URL),
+      fetchText(CFG.SHEET_SKU_VALIDACION_CSV_URL),
+      Promise.all(ventaSources.map(v => fetchText(v.url)))
+    ]).then(([tasksText, skuText, ventaTexts]) => {
+      DATA = rowsFromCsv(tasksText);
+      segmentColors = buildSegmentColors(DATA);
+
+      const skuMap = parseSkuValidacion(skuText);
+      const purchaseMap = new Map();
+      ventaTexts.forEach((text, i) => {
+        const codDdcWh = ventaSources[i].cod_ddc_wh;
+        const m = parseVenta(text, codDdcWh);
+        m.forEach((skus, clienteId) => {
+          if (!purchaseMap.has(clienteId)) purchaseMap.set(clienteId, new Set());
+          skus.forEach(s => purchaseMap.get(clienteId).add(s));
+        });
       });
+      applyPreValidacion(DATA, skuMap, purchaseMap);
+
+      if (DATA.length === 0) {
+        statusEl.textContent = "La hoja no tiene filas con PILAR = VALUE_CREATION.";
+        statusEl.className = "status status-error";
+      } else {
+        statusEl.textContent = "";
+        statusEl.className = "status";
+      }
+      const maxDia = DATA.reduce((m, r) => r.dia > m ? r.dia : m, "");
+      document.getElementById("badge-updated").textContent = "📅 Datos al dia: " + (maxDia || "-");
+      document.getElementById("badge-count").textContent = fmtInt(DATA.length) + " registros";
+      populateFilters();
+      render();
+    }).catch(err => {
+      statusEl.textContent = "No se pudo cargar la base: " + err.message;
+      statusEl.className = "status status-error";
+    });
   }
 
   document.getElementById("btn-refresh").addEventListener("click", loadData);
@@ -283,11 +379,13 @@
 
   function renderKpis(rows) {
     const cant = sumBy(rows, "cant"), comp = sumBy(rows, "comp"), val = sumBy(rows, "val"),
-      compNoVal = sumBy(rows, "compNoVal");
+      compNoVal = sumBy(rows, "compNoVal"),
+      preValNum = sumBy(rows, "preValNum"), preValDenom = sumBy(rows, "preValDenom");
     const cards = [
       { label: "Tareas (Value Creation)", value: fmtInt(cant) },
       { label: "% Completadas", value: fmtPct(pct(comp, cant)) },
       { label: "% Validadas", value: fmtPct(pct(val, cant)) },
+      { label: "% Pre-validada (por SKU comprado)", value: fmtPct(pct(preValNum, preValDenom)) },
       { label: "% Completadas no validadas", value: fmtPct(pct(compNoVal, comp)) }
     ];
     document.getElementById("kpis").innerHTML = cards.map(c =>
@@ -305,8 +403,12 @@
     const result = [];
     map.forEach((groupRows, key) => {
       const cant = sumBy(groupRows, "cant"), comp = sumBy(groupRows, "comp"),
-        val = sumBy(groupRows, "val"), compNoVal = sumBy(groupRows, "compNoVal");
-      result.push({ name: key, cant, comp, val, compNoVal, pctVal: pct(val, cant), pctComp: pct(comp, cant) });
+        val = sumBy(groupRows, "val"), compNoVal = sumBy(groupRows, "compNoVal"),
+        preValNum = sumBy(groupRows, "preValNum"), preValDenom = sumBy(groupRows, "preValDenom");
+      result.push({
+        name: key, cant, comp, val, compNoVal, preValNum, preValDenom,
+        pctVal: pct(val, cant), pctComp: pct(comp, cant), pctPreVal: pct(preValNum, preValDenom)
+      });
     });
     result.sort((a, b) => b.pctVal - a.pctVal);
     return result;
@@ -324,8 +426,11 @@
     opts = opts || {};
     const shown = rows.slice(0, opts.limit || rows.length);
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
-      '</th><th>Tareas</th><th>Completadas</th><th>Validadas</th><th>% Validada</th><th>% Completada</th></tr></thead><tbody>';
+      '</th><th>Tareas</th><th>Completadas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th><th>% Completada</th></tr></thead><tbody>';
     shown.forEach((r, i) => {
+      const preValCell = r.preValDenom > 0
+        ? `<td class="pct-cell" style="background:${colorForPct(r.pctPreVal)}">${fmtPct(r.pctPreVal)}</td>`
+        : `<td class="num">&mdash;</td>`;
       html += `<tr>
         <td class="num">${i + 1}</td>
         <td class="name-cell">${escapeHtml(r.name)}</td>
@@ -333,6 +438,7 @@
         <td class="num">${fmtInt(r.comp)}</td>
         <td class="num">${fmtInt(r.val)}</td>
         <td class="pct-cell" style="background:${colorForPct(r.pctVal)}">${fmtPct(r.pctVal)}</td>
+        ${preValCell}
         <td class="num">${fmtPct(r.pctComp)}</td>
       </tr>`;
     });
