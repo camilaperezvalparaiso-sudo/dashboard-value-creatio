@@ -132,15 +132,17 @@ body {
 }
 .filter-pill select:focus { outline: none; }
 
-.filter-pill-daterange { min-width: auto; }
-.daterange { display: flex; align-items: center; gap: 5px; }
+.filter-pill-daterange { width: 220px; flex: 0 0 220px; }
+.daterange { display: flex; align-items: center; gap: 4px; }
 .daterange input[type="date"] {
   border: none;
   background: transparent;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text);
   padding: 1px 0 3px;
   font-family: inherit;
+  width: 92px;
+  min-width: 0;
 }
 .daterange input[type="date"]:focus { outline: none; }
 .daterange span { color: var(--text-muted); font-size: 11px; }
@@ -363,7 +365,7 @@ table.rank-table thead th {
   position: sticky;
   top: 0;
   background: #f7f9fc;
-  text-align: left;
+  text-align: center;
   padding: 7px 8px;
   font-size: 11px;
   font-weight: 700;
@@ -372,6 +374,7 @@ table.rank-table thead th {
   color: var(--text-muted);
   border-bottom: 1px solid var(--border);
 }
+table.rank-table thead th:nth-child(2) { text-align: left; }
 table.rank-table td {
   padding: 7px 8px;
   border-bottom: 1px solid #f1f3f8;
