@@ -104,10 +104,12 @@
       const tarea = row[idx.TAREA] || "";
       const val = num(row[idx.TAREAS_VALIDADAS]);
 
-      // Tareas *BONUS*: si no estan validadas, no cuentan como enviadas (se excluyen
-      // del todo); si estan validadas, cuentan como enviadas y validadas normalmente.
+      // Tareas *BONUS*: si no estan validadas, no cuentan como enviadas para las
+      // metricas (cant=0 => no suman ni como enviadas ni como validadas), pero la
+      // fila se conserva (no se descarta) porque la Hoja de Ruta necesita verla para
+      // mostrar cuanto le falta al cliente para cumplir el objetivo.
       const isBonus = /BONUS/i.test(tarea);
-      if (isBonus && val !== 1) continue;
+      const bonusExcluded = isBonus && val !== 1;
 
       out.push({
         dia: row[idx.dia] || "",
@@ -120,7 +122,7 @@
         canal: row[idx.CANAL] || "",
         segmento: segmentGroupName(row[idx.SEGMENTO] || ""),
         tarea: tarea,
-        cant: num(row[idx.CANTIDAD_TAREAS]),
+        cant: bonusExcluded ? 0 : num(row[idx.CANTIDAD_TAREAS]),
         comp: num(row[idx.TAREAS_COMPLETADAS]),
         val: val,
         compNoVal: num(row[idx.TAREAS_COMPLETADAS_NO_VALIDADAS]),
@@ -712,7 +714,7 @@
     const clientes = CLIENTES.filter(c => sameTokens(c.personalComercial, promotor) && c.diasVisita.has(dia));
     const items = clientes.map(c => {
       const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.comp === 0);
-      return { c, tareas: pendientes.map(p => p.tarea) };
+      return { c, tareas: pendientes.map(formatTareaPendiente) };
     }).filter(it => it.tareas.length > 0);
 
     if (items.length === 0) {
@@ -743,6 +745,15 @@
     hrShareText = lines.join("\n");
     copyBtn.disabled = false;
     waBtn.disabled = false;
+  }
+
+  // Para tareas *BONUS* de "comprar X bultos", agrega cuantos bultos le faltan
+  // al cliente para llegar al objetivo (bultos_esperado - bultos_validado).
+  function formatTareaPendiente(r) {
+    const isBonusBultos = /BONUS/i.test(r.tarea) && /BULTO/i.test(r.tarea);
+    if (!isBonusBultos) return r.tarea;
+    const restante = Math.max(0, (r.bultosEsp || 0) - (r.bultosVal || 0));
+    return r.tarea + " (bultos restantes para objetivo: " + restante + ")";
   }
 
   // ---------- Init (al final, ya que todo lo anterior esta definido) ----------
