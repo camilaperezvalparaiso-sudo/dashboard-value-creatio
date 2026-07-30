@@ -124,6 +124,39 @@
     </div>
   </section>
 
+  <section class="card panel">
+    <div class="panel-header">
+      <span class="dot"></span>
+      <h2>Hoja de Ruta del Promotor</h2>
+      <span class="pill-badge">TAREAS PENDIENTES</span>
+    </div>
+    <div class="panel-subtitle">Eleg&iacute; promotor y d&iacute;a de visita para ver los clientes de esa ruta con tareas de Value Creation sin completar.</div>
+
+    <div class="hr-controls">
+      <div class="filter-pill">
+        <label>Promotor</label>
+        <select id="hr-promotor"><option value="">Seleccion&aacute;...</option></select>
+      </div>
+      <div class="filter-pill">
+        <label>D&iacute;a de visita</label>
+        <select id="hr-dia">
+          <option value="">Seleccion&aacute;...</option>
+          <option value="LUN">Lunes</option>
+          <option value="MAR">Martes</option>
+          <option value="MIE">Mi&eacute;rcoles</option>
+          <option value="JUE">Jueves</option>
+          <option value="VIE">Viernes</option>
+          <option value="SAB">S&aacute;bado</option>
+        </select>
+      </div>
+      <button id="hr-copy" class="btn-outline" disabled>Copiar</button>
+      <button id="hr-whatsapp" class="btn-outline" disabled>Enviar por WhatsApp</button>
+    </div>
+
+    <div id="hr-status" class="status"></div>
+    <div class="table-scroll table-scroll-tall" id="hr-results"></div>
+  </section>
+
   <footer class="footer">
     Dashboard en vivo: lee la base directamente desde la Google Sheet publicada. Alcance: solo tareas PILAR = VALUE_CREATION.
   </footer>

@@ -22,6 +22,12 @@ window.DASHBOARD_CONFIG = {
     { cod_ddc_wh: "166364", url: "https://docs.google.com/spreadsheets/d/1RbMNjl8USGEVMO7j6xfa0eNLAJ-7sfK4zIFpYhBmRvQ/export?format=csv&gid=16708678" }
   ],
 
+  // Bases de clientes (BC), una por distribuidor. Mismo codigo de cliente que en venta.
+  CLIENTES_SOURCES: [
+    { cod_ddc_wh: "135908", url: "https://docs.google.com/spreadsheets/d/1RbMNjl8USGEVMO7j6xfa0eNLAJ-7sfK4zIFpYhBmRvQ/export?format=csv&gid=2058094724" },
+    { cod_ddc_wh: "166364", url: "https://docs.google.com/spreadsheets/d/1RbMNjl8USGEVMO7j6xfa0eNLAJ-7sfK4zIFpYhBmRvQ/export?format=csv&gid=1716528710" }
+  ],
+
   // Objetivo mensual de % validadas para promotores (barras del ranking por promotor).
   // Cambialo cada mes segun corresponda. PROMOTOR_TARGET_DEFAULT aplica a todos los
   // promotores salvo que tengan una excepcion en PROMOTOR_TARGET_OVERRIDES (las claves

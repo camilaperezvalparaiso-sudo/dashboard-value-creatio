@@ -182,6 +182,39 @@
     return map;
   }
 
+  function parseClientes(text, codDdcWh) {
+    const table = parseCsv(text);
+    if (table.length < 2) return [];
+    const headers = table[0].map(h => h.trim());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    const req = ["Cliente", "Razon social", "Domicilio", "Fuerza de venta 1 Dias de visita", "Fuerza de venta 1 Descripcion personal comercial"];
+    const missing = req.filter(h => !(h in idx));
+    if (missing.length) {
+      throw new Error("La base de clientes necesita las columnas: " + missing.join(", "));
+    }
+    const out = [];
+    for (let r = 1; r < table.length; r++) {
+      const row = table[r];
+      if (!row) continue;
+      const clientCode = onlyDigits(row[idx["Cliente"]]);
+      if (!clientCode) continue;
+      const diasVisita = new Set(
+        String(row[idx["Fuerza de venta 1 Dias de visita"]] || "")
+          .split(",").map(d => d.trim().toUpperCase()).filter(Boolean)
+      );
+      out.push({
+        clienteFull: codDdcWh + clientCode.padStart(8, "0"),
+        codigoCliente: clientCode,
+        razonSocial: row[idx["Razon social"]] || "",
+        domicilio: row[idx["Domicilio"]] || "",
+        personalComercial: row[idx["Fuerza de venta 1 Descripcion personal comercial"]] || "",
+        diasVisita: diasVisita
+      });
+    }
+    return out;
+  }
+
   function applyPreValidacion(tasks, skuMap, purchaseMap) {
     tasks.forEach(t => {
       const validSkus = skuMap.get(normalizeText(t.tarea));
@@ -223,17 +256,21 @@
     });
   }
 
+  let CLIENTES = [];
+
   function loadData() {
     statusEl.textContent = "Cargando datos...";
     statusEl.className = "status status-loading";
 
     const ventaSources = CFG.VENTA_SOURCES || [];
+    const clientesSources = CFG.CLIENTES_SOURCES || [];
 
     Promise.all([
       fetchText(CFG.SHEET_TASKS_CSV_URL),
       fetchText(CFG.SHEET_SKU_VALIDACION_CSV_URL),
-      Promise.all(ventaSources.map(v => fetchText(v.url)))
-    ]).then(([tasksText, skuText, ventaTexts]) => {
+      Promise.all(ventaSources.map(v => fetchText(v.url))),
+      Promise.all(clientesSources.map(c => fetchText(c.url)))
+    ]).then(([tasksText, skuText, ventaTexts, clientesTexts]) => {
       DATA = rowsFromCsv(tasksText);
       segmentColors = buildSegmentColors(DATA);
 
@@ -249,6 +286,11 @@
       });
       applyPreValidacion(DATA, skuMap, purchaseMap);
 
+      CLIENTES = [];
+      clientesTexts.forEach((text, i) => {
+        CLIENTES = CLIENTES.concat(parseClientes(text, clientesSources[i].cod_ddc_wh));
+      });
+
       if (DATA.length === 0) {
         statusEl.textContent = "La hoja no tiene filas con PILAR = VALUE_CREATION.";
         statusEl.className = "status status-error";
@@ -260,6 +302,7 @@
       document.getElementById("badge-updated").textContent = "📅 Datos al dia: " + (maxDia || "-");
       document.getElementById("badge-count").textContent = fmtInt(DATA.length) + " registros";
       populateFilters();
+      populateHojaRuta();
       render();
     }).catch(err => {
       statusEl.textContent = "No se pudo cargar la base: " + err.message;
@@ -615,6 +658,91 @@
     renderRankBars("rank-promotor", byPromotor, 15, getPromotorTarget);
     renderRankBars("rank-supervisor", bySupervisor);
     renderRankBars("rank-distribuidor", byDistribuidor);
+  }
+
+  // ---------- Hoja de ruta del promotor ----------
+  let hrBuilt = false;
+  let hrShareText = "";
+
+  function populateHojaRuta() {
+    const sel = document.getElementById("hr-promotor");
+    const current = sel.value;
+    const promotores = uniqueSorted(DATA, "promotor");
+    sel.innerHTML = '<option value="">Selecciona...</option>' +
+      promotores.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("");
+    sel.value = promotores.includes(current) ? current : "";
+
+    if (!hrBuilt) {
+      hrBuilt = true;
+      sel.addEventListener("change", renderHojaRuta);
+      document.getElementById("hr-dia").addEventListener("change", renderHojaRuta);
+      document.getElementById("hr-copy").addEventListener("click", () => {
+        if (!hrShareText) return;
+        navigator.clipboard.writeText(hrShareText).then(() => {
+          const btn = document.getElementById("hr-copy");
+          const original = btn.textContent;
+          btn.textContent = "Copiado!";
+          setTimeout(() => { btn.textContent = original; }, 1500);
+        });
+      });
+      document.getElementById("hr-whatsapp").addEventListener("click", () => {
+        if (!hrShareText) return;
+        window.open("https://wa.me/?text=" + encodeURIComponent(hrShareText), "_blank");
+      });
+    }
+  }
+
+  function renderHojaRuta() {
+    const promotor = document.getElementById("hr-promotor").value;
+    const dia = document.getElementById("hr-dia").value;
+    const resultsEl = document.getElementById("hr-results");
+    const statusEl2 = document.getElementById("hr-status");
+    const copyBtn = document.getElementById("hr-copy");
+    const waBtn = document.getElementById("hr-whatsapp");
+
+    if (!promotor || !dia) {
+      resultsEl.innerHTML = "";
+      statusEl2.textContent = "";
+      copyBtn.disabled = true;
+      waBtn.disabled = true;
+      hrShareText = "";
+      return;
+    }
+
+    const clientes = CLIENTES.filter(c => sameTokens(c.personalComercial, promotor) && c.diasVisita.has(dia));
+    const items = clientes.map(c => {
+      const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.comp === 0);
+      return { c, tareas: pendientes.map(p => p.tarea) };
+    }).filter(it => it.tareas.length > 0);
+
+    if (items.length === 0) {
+      resultsEl.innerHTML = "";
+      statusEl2.textContent = "No hay clientes de " + promotor + " con tareas pendientes ese dia.";
+      statusEl2.className = "status";
+      copyBtn.disabled = true;
+      waBtn.disabled = true;
+      hrShareText = "";
+      return;
+    }
+    statusEl2.textContent = "";
+
+    resultsEl.innerHTML = items.map(it => `<div class="hr-client-block">
+        <div class="hr-client-title">${escapeHtml(it.c.codigoCliente)} &mdash; ${escapeHtml(it.c.razonSocial)}</div>
+        <div class="hr-client-addr">${escapeHtml(it.c.domicilio)}</div>
+        <ul class="hr-client-tasks">${it.tareas.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
+      </div>`).join("");
+
+    const dayLabel = document.getElementById("hr-dia").selectedOptions[0].textContent;
+    const lines = [`*Hoja de ruta - ${promotor} - ${dayLabel}*`, ""];
+    items.forEach(it => {
+      lines.push(`${it.c.codigoCliente} - ${it.c.razonSocial}`);
+      lines.push(it.c.domicilio);
+      it.tareas.forEach(t => lines.push("  - " + t));
+      lines.push("");
+    });
+    hrShareText = lines.join("\n");
+    copyBtn.disabled = false;
+    waBtn.disabled = false;
   }
 
   // ---------- Init (al final, ya que todo lo anterior esta definido) ----------
