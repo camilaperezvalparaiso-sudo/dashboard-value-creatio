@@ -411,12 +411,21 @@
     return result;
   }
 
+  const PCT_COLOR_STOPS = [
+    [165, 0, 38], [215, 48, 39], [244, 109, 67], [253, 174, 97], [254, 224, 139],
+    [255, 255, 191], [217, 239, 139], [166, 217, 106], [102, 189, 99], [26, 152, 80], [0, 104, 55]
+  ];
   function colorForPct(p) {
     const clamp = Math.max(0, Math.min(1, p));
-    let r, g, b = 90;
-    if (clamp < 0.5) { const t = clamp / 0.5; r = 192; g = Math.round(57 + (184 - 57) * t); }
-    else { const t = (clamp - 0.5) / 0.5; r = Math.round(192 - (192 - 30) * t); g = Math.round(184 + (143 - 184) * t); }
-    return `rgba(${r},${g},${b},0.25)`;
+    const scaled = clamp * (PCT_COLOR_STOPS.length - 1);
+    const i = Math.floor(scaled);
+    const frac = scaled - i;
+    const c0 = PCT_COLOR_STOPS[i], c1 = PCT_COLOR_STOPS[Math.min(i + 1, PCT_COLOR_STOPS.length - 1)];
+    const r = Math.round(c0[0] + (c1[0] - c0[0]) * frac);
+    const g = Math.round(c0[1] + (c1[1] - c0[1]) * frac);
+    const b = Math.round(c0[2] + (c1[2] - c0[2]) * frac);
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    return { bg: `rgb(${r},${g},${b})`, text: luminance > 150 ? "#1c2b3a" : "#ffffff" };
   }
 
   function renderTable(containerId, rows, opts) {
@@ -425,15 +434,16 @@
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
       '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th></tr></thead><tbody>';
     shown.forEach((r, i) => {
+      const vc = colorForPct(r.pctVal);
       const preValCell = r.preValDenom > 0
-        ? `<td class="pct-cell" style="background:${colorForPct(r.pctPreVal)}">${fmtPct(r.pctPreVal)}</td>`
+        ? `<td class="pct-cell">${fmtPct(r.pctPreVal)}</td>`
         : `<td class="num">&mdash;</td>`;
       html += `<tr>
         <td class="num">${i + 1}</td>
         <td class="name-cell">${escapeHtml(r.name)}</td>
         <td class="num">${fmtInt(r.cant)}</td>
         <td class="num">${fmtInt(r.val)}</td>
-        <td class="pct-cell" style="background:${colorForPct(r.pctVal)}">${fmtPct(r.pctVal)}</td>
+        <td class="pct-cell" style="background:${vc.bg};color:${vc.text}">${fmtPct(r.pctVal)}</td>
         ${preValCell}
       </tr>`;
     });
@@ -481,17 +491,11 @@
   }
 
   function renderPesoList(containerId, items) {
-    const html = items.map((it, i) => {
-      const width = Math.max(2, Math.min(100, it.pctPeso * 100));
-      return `<div class="rankbar">
+    const html = items.map((it, i) => `<div class="rankbar rankbar-simple">
         <div class="rankbar-pos">${i + 1}</div>
-        <div class="rankbar-body">
-          <div class="rankbar-name" title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</div>
-          <div class="rankbar-track"><div class="rankbar-fill" style="width:${width}%;background:#0ea5b8"></div></div>
-        </div>
+        <div class="rankbar-name" title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</div>
         <div class="rankbar-pct" style="color:#0ea5b8">${fmtPct(it.pctPeso)}</div>
-      </div>`;
-    }).join("");
+      </div>`).join("");
     document.getElementById(containerId).innerHTML = html;
   }
 

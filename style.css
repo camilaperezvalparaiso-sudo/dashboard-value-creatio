@@ -304,6 +304,7 @@ body {
   margin-bottom: 3px;
 }
 .rankbar-track { background: #eef1f6; border-radius: 999px; height: 9px; overflow: hidden; }
+.rankbar-simple .rankbar-name { flex: 1 1 auto; min-width: 0; margin-bottom: 0; }
 .rankbar-fill { height: 100%; border-radius: 999px; }
 .rankbar-pct {
   flex: 0 0 56px;
