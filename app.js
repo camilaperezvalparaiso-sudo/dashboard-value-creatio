@@ -713,7 +713,9 @@
 
     const clientes = CLIENTES.filter(c => sameTokens(c.personalComercial, promotor) && c.diasVisita.has(dia));
     const items = clientes.map(c => {
-      const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.comp === 0);
+      // "Pendiente" = todavia no validada (no alcanzo el objetivo/compra real), sin
+      // importar si el promotor la marco como completada en la visita.
+      const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.val === 0);
       return { c, tareas: pendientes.map(formatTareaPendiente) };
     }).filter(it => it.tareas.length > 0);
 
