@@ -321,7 +321,6 @@
     { field: "supervisor", label: "Supervisor", id: "f-supervisor", kind: "select" },
     { field: "promotor", label: "Promotor", id: "f-promotor", kind: "select" },
     { field: "canal", label: "Canal", id: "f-canal", kind: "select" },
-    { field: "business", label: "Negocio", kind: "chip" },
     { field: "segmento", label: "Segmento", kind: "card" }
   ];
   const state = { diaDesde: "", diaHasta: "" };
@@ -363,19 +362,6 @@
       desdeEl.min = minD; desdeEl.max = maxD;
       hastaEl.min = minD; hastaEl.max = maxD;
     }
-
-    const businessValues = uniqueSorted(DATA, "business");
-    const chipHost = document.getElementById("f-business-chips");
-    chipHost.innerHTML = businessValues.map(v =>
-      `<button type="button" class="chip" data-value="${escapeHtml(v)}">${escapeHtml(v)}</button>`
-    ).join("");
-    chipHost.querySelectorAll(".chip").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const v = btn.getAttribute("data-value");
-        state.business = (state.business === v) ? "TODOS" : v;
-        render();
-      });
-    });
 
     if (!filtersBuilt) {
       filtersBuilt = true;
@@ -434,7 +420,6 @@
     const cant = sumBy(rows, "cant"), val = sumBy(rows, "val"),
       preValNum = sumBy(rows, "preValNum"), preValDenom = sumBy(rows, "preValDenom");
     const cards = [
-      { label: "Tareas (Value Creation)", value: fmtInt(cant) },
       { label: "% Validadas", value: fmtPct(pct(val, cant)) },
       { label: "% Pre-validada (por SKU comprado)", value: fmtPct(pct(preValNum, preValDenom)) }
     ];
@@ -493,13 +478,15 @@
   function renderTable(containerId, rows, opts) {
     opts = opts || {};
     const shown = rows.slice(0, opts.limit || rows.length);
+    const extraHeader = opts.extraColumn ? `<th>${opts.extraColumn.label}</th>` : "";
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
-      '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th></tr></thead><tbody>';
+      '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th>' + extraHeader + '</tr></thead><tbody>';
     shown.forEach((r, i) => {
       const bg = opts.colorFn ? opts.colorFn(r) : colorForPct(r.pctVal);
       const preValCell = r.preValDenom > 0
         ? `<td class="pct-cell">${fmtPct(r.pctPreVal)}</td>`
         : `<td class="num">&mdash;</td>`;
+      const extraCell = opts.extraColumn ? `<td class="num">${opts.extraColumn.fn(r)}</td>` : "";
       html += `<tr>
         <td class="num">${i + 1}</td>
         <td class="name-cell">${escapeHtml(r.name)}</td>
@@ -507,10 +494,18 @@
         <td class="num">${fmtInt(r.val)}</td>
         <td class="pct-cell" style="background:${bg}">${fmtPct(r.pctVal)}</td>
         ${preValCell}
+        ${extraCell}
       </tr>`;
     });
     html += "</tbody></table>";
     document.getElementById(containerId).innerHTML = html;
+  }
+
+  // Cuantas tareas mas necesita validar (con la misma cantidad total de tareas)
+  // para llegar a su objetivo de % validada.
+  function tareasRestantesParaObjetivo(cant, val, target) {
+    if (!target || cant <= 0) return 0;
+    return Math.max(0, Math.ceil(target * cant - val));
   }
 
   function semaforoColor(p) {
@@ -594,7 +589,7 @@
     });
   }
 
-  const FILTER_TAG_LABELS = { dia: "Periodo", distribuidor: "Dist", supervisor: "Sup", promotor: "Prom", canal: "Canal", business: "Negocio", segmento: "Segmento" };
+  const FILTER_TAG_LABELS = { dia: "Periodo", distribuidor: "Dist", supervisor: "Sup", promotor: "Prom", canal: "Canal", segmento: "Segmento" };
   function renderActiveTags() {
     const simpleActive = ALL_FILTERS.filter(f => f.kind !== "daterange" && state[f.field] !== "TODOS");
     const diaActive = !!(state.diaDesde || state.diaHasta);
@@ -627,9 +622,6 @@
         render();
       });
     });
-    document.querySelectorAll("#f-business-chips .chip").forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("data-value") === state.business);
-    });
   }
 
   function render() {
@@ -648,7 +640,11 @@
 
     renderTable("table-promotor", byPromotor, {
       nameLabel: "Promotor",
-      colorFn: r => colorForRatio(r.pctVal, getPromotorTarget(r.name))
+      colorFn: r => colorForRatio(r.pctVal, getPromotorTarget(r.name)),
+      extraColumn: {
+        label: "Tareas restantes para objetivo",
+        fn: r => fmtInt(tareasRestantesParaObjetivo(r.cant, r.val, getPromotorTarget(r.name)))
+      }
     });
     renderTable("table-supervisor", bySupervisor, {
       nameLabel: "Supervisor",
