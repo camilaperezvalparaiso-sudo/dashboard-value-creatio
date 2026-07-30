@@ -104,13 +104,14 @@ body {
   background: #fafbfd;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 5px 12px;
-  min-width: 140px;
+  padding: 4px 10px;
+  width: 130px;
+  flex: 0 0 130px;
   transition: border-color .12s, box-shadow .12s;
 }
 .filter-pill:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20,184,166,0.12); }
 .filter-pill label {
-  font-size: 9.5px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--text-muted);
@@ -119,10 +120,15 @@ body {
 .filter-pill select {
   border: none;
   background: transparent;
-  font-size: 12.5px;
+  font-size: 12px;
   font-family: inherit;
   color: var(--text);
   padding: 1px 0 3px;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .filter-pill select:focus { outline: none; }
 
@@ -377,8 +383,8 @@ table.rank-table td.name-cell {
   max-width: 260px;
   font-weight: 500;
 }
-table.rank-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-table.rank-table td.pct-cell { font-weight: 700; text-align: right; color: var(--text); border-radius: 6px; }
+table.rank-table td.num { text-align: center; font-variant-numeric: tabular-nums; }
+table.rank-table td.pct-cell { font-weight: 700; text-align: center; color: var(--text); border-radius: 6px; }
 
 .footer {
   padding: 18px 28px 30px;
