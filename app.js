@@ -74,6 +74,14 @@
     return d ? String(parseInt(d, 10)) : normalizeText(v);
   }
 
+  // Agrupa los segmentos de producto en las categorias que se muestran en el dashboard.
+  function segmentGroupName(raw) {
+    const s = normalizeText(raw);
+    if (s === "CORE +" || s === "PREMIUM" || s === "SUPER PREMIUM") return "Above Core";
+    if (s === "FAMILIARES" || s === "SINGLE SERVE" || s === "WATER" || s === "NA" || s === "") return "Nabs";
+    return raw || "(sin dato)";
+  }
+
   function rowsFromCsv(text) {
     const table = parseCsv(text);
     if (table.length < 2) return [];
@@ -110,7 +118,7 @@
         clienteId: onlyDigits(row[idx.cliente_id]),
         business: row[idx.BUSINESS] || "",
         canal: row[idx.CANAL] || "",
-        segmento: row[idx.SEGMENTO] || "",
+        segmento: segmentGroupName(row[idx.SEGMENTO] || ""),
         tarea: tarea,
         cant: num(row[idx.CANTIDAD_TAREAS]),
         comp: num(row[idx.TAREAS_COMPLETADAS]),
