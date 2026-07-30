@@ -343,7 +343,7 @@ table.rank-table td.name-cell {
   max-width: 260px;
 }
 table.rank-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-table.rank-table td.pct-cell { font-weight: 700; text-align: right; }
+table.rank-table td.pct-cell { font-weight: 700; text-align: right; color: var(--text); }
 
 .footer {
   padding: 18px 28px 30px;

@@ -424,8 +424,16 @@
     const r = Math.round(c0[0] + (c1[0] - c0[0]) * frac);
     const g = Math.round(c0[1] + (c1[1] - c0[1]) * frac);
     const b = Math.round(c0[2] + (c1[2] - c0[2]) * frac);
-    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-    return { bg: `rgb(${r},${g},${b})`, text: luminance > 150 ? "#1c2b3a" : "#ffffff" };
+    return `rgb(${r},${g},${b})`;
+  }
+
+  // Verde si llego (o supero) el objetivo; por debajo del objetivo escala de
+  // amarillo (cerca) a rojo (lejos). El salto a verde es deliberado: llegar
+  // al objetivo es un logro puntual, no un gradiente mas.
+  function colorForRatio(pctVal, target) {
+    const ratio = target > 0 ? pctVal / target : 0;
+    const t = ratio >= 1 ? Math.min(1, 0.75 + (ratio - 1) * 0.5) : Math.max(0, ratio) * 0.5;
+    return colorForPct(t);
   }
 
   function renderTable(containerId, rows, opts) {
@@ -434,7 +442,7 @@
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
       '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th></tr></thead><tbody>';
     shown.forEach((r, i) => {
-      const vc = colorForPct(r.pctVal);
+      const bg = opts.colorFn ? opts.colorFn(r) : colorForPct(r.pctVal);
       const preValCell = r.preValDenom > 0
         ? `<td class="pct-cell">${fmtPct(r.pctPreVal)}</td>`
         : `<td class="num">&mdash;</td>`;
@@ -443,7 +451,7 @@
         <td class="name-cell">${escapeHtml(r.name)}</td>
         <td class="num">${fmtInt(r.cant)}</td>
         <td class="num">${fmtInt(r.val)}</td>
-        <td class="pct-cell" style="background:${vc.bg};color:${vc.text}">${fmtPct(r.pctVal)}</td>
+        <td class="pct-cell" style="background:${bg}">${fmtPct(r.pctVal)}</td>
         ${preValCell}
       </tr>`;
     });
@@ -584,8 +592,14 @@
     const topTareasPeso = byTarea.slice().sort((a, b) => b.cant - a.cant).slice(0, 5)
       .map(t => ({ name: t.name, pctPeso: pct(t.cant, totalCant) }));
 
-    renderTable("table-promotor", byPromotor, { nameLabel: "Promotor" });
-    renderTable("table-supervisor", bySupervisor, { nameLabel: "Supervisor" });
+    renderTable("table-promotor", byPromotor, {
+      nameLabel: "Promotor",
+      colorFn: r => colorForRatio(r.pctVal, getPromotorTarget(r.name))
+    });
+    renderTable("table-supervisor", bySupervisor, {
+      nameLabel: "Supervisor",
+      colorFn: r => colorForRatio(r.pctVal, CFG.PROMOTOR_TARGET_DEFAULT)
+    });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
     renderPesoList("top-tareas-list", topTareasPeso);
 
