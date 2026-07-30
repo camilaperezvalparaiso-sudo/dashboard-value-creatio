@@ -378,15 +378,12 @@
   function fmtInt(x) { return x.toLocaleString("es-AR"); }
 
   function renderKpis(rows) {
-    const cant = sumBy(rows, "cant"), comp = sumBy(rows, "comp"), val = sumBy(rows, "val"),
-      compNoVal = sumBy(rows, "compNoVal"),
+    const cant = sumBy(rows, "cant"), val = sumBy(rows, "val"),
       preValNum = sumBy(rows, "preValNum"), preValDenom = sumBy(rows, "preValDenom");
     const cards = [
       { label: "Tareas (Value Creation)", value: fmtInt(cant) },
-      { label: "% Completadas", value: fmtPct(pct(comp, cant)) },
       { label: "% Validadas", value: fmtPct(pct(val, cant)) },
-      { label: "% Pre-validada (por SKU comprado)", value: fmtPct(pct(preValNum, preValDenom)) },
-      { label: "% Completadas no validadas", value: fmtPct(pct(compNoVal, comp)) }
+      { label: "% Pre-validada (por SKU comprado)", value: fmtPct(pct(preValNum, preValDenom)) }
     ];
     document.getElementById("kpis").innerHTML = cards.map(c =>
       `<div class="kpi-card"><div class="kpi-label">${c.label}</div><div class="kpi-value">${c.value}</div></div>`
@@ -426,7 +423,7 @@
     opts = opts || {};
     const shown = rows.slice(0, opts.limit || rows.length);
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
-      '</th><th>Tareas</th><th>Completadas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th><th>% Completada</th></tr></thead><tbody>';
+      '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th></tr></thead><tbody>';
     shown.forEach((r, i) => {
       const preValCell = r.preValDenom > 0
         ? `<td class="pct-cell" style="background:${colorForPct(r.pctPreVal)}">${fmtPct(r.pctPreVal)}</td>`
@@ -435,11 +432,9 @@
         <td class="num">${i + 1}</td>
         <td class="name-cell">${escapeHtml(r.name)}</td>
         <td class="num">${fmtInt(r.cant)}</td>
-        <td class="num">${fmtInt(r.comp)}</td>
         <td class="num">${fmtInt(r.val)}</td>
         <td class="pct-cell" style="background:${colorForPct(r.pctVal)}">${fmtPct(r.pctVal)}</td>
         ${preValCell}
-        <td class="num">${fmtPct(r.pctComp)}</td>
       </tr>`;
     });
     html += "</tbody></table>";
@@ -566,11 +561,12 @@
     const bySupervisor = groupBy(rows, "supervisor");
     const byDistribuidor = groupBy(rows, "distribuidor");
     const byTarea = groupBy(rows, "tarea");
+    const topTareasVolumen = byTarea.slice().sort((a, b) => b.cant - a.cant).slice(0, 5);
 
     renderTable("table-promotor", byPromotor, { nameLabel: "Promotor" });
     renderTable("table-supervisor", bySupervisor, { nameLabel: "Supervisor" });
-    renderTable("table-distribuidor", byDistribuidor, { nameLabel: "Distribuidor" });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
+    renderTable("table-top-tareas", topTareasVolumen, { nameLabel: "Tarea" });
 
     renderRankBars("rank-promotor", byPromotor, 15, getPromotorTarget);
     renderRankBars("rank-supervisor", bySupervisor);
