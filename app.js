@@ -411,9 +411,10 @@
     return result;
   }
 
+  // Escala clasica tipo Excel (rojo-amarillo-verde), pensada para que el texto
+  // negro se lea bien en toda la escala.
   const PCT_COLOR_STOPS = [
-    [165, 0, 38], [215, 48, 39], [244, 109, 67], [253, 174, 97], [254, 224, 139],
-    [255, 255, 191], [217, 239, 139], [166, 217, 106], [102, 189, 99], [26, 152, 80], [0, 104, 55]
+    [248, 105, 107], [255, 235, 132], [99, 190, 123]
   ];
   function colorForPct(p) {
     const clamp = Math.max(0, Math.min(1, p));
