@@ -480,6 +480,21 @@
     document.getElementById(containerId).innerHTML = html;
   }
 
+  function renderPesoList(containerId, items) {
+    const html = items.map((it, i) => {
+      const width = Math.max(2, Math.min(100, it.pctPeso * 100));
+      return `<div class="rankbar">
+        <div class="rankbar-pos">${i + 1}</div>
+        <div class="rankbar-body">
+          <div class="rankbar-name" title="${escapeHtml(it.name)}">${escapeHtml(it.name)}</div>
+          <div class="rankbar-track"><div class="rankbar-fill" style="width:${width}%;background:#0ea5b8"></div></div>
+        </div>
+        <div class="rankbar-pct" style="color:#0ea5b8">${fmtPct(it.pctPeso)}</div>
+      </div>`;
+    }).join("");
+    document.getElementById(containerId).innerHTML = html;
+  }
+
   function renderSegmentCards() {
     const rows = getFilteredExcept("segmento");
     const cant = sumBy(rows, "cant"), val = sumBy(rows, "val");
@@ -561,12 +576,14 @@
     const bySupervisor = groupBy(rows, "supervisor");
     const byDistribuidor = groupBy(rows, "distribuidor");
     const byTarea = groupBy(rows, "tarea");
-    const topTareasVolumen = byTarea.slice().sort((a, b) => b.cant - a.cant).slice(0, 5);
+    const totalCant = sumBy(rows, "cant");
+    const topTareasPeso = byTarea.slice().sort((a, b) => b.cant - a.cant).slice(0, 5)
+      .map(t => ({ name: t.name, pctPeso: pct(t.cant, totalCant) }));
 
     renderTable("table-promotor", byPromotor, { nameLabel: "Promotor" });
     renderTable("table-supervisor", bySupervisor, { nameLabel: "Supervisor" });
     renderTable("table-tarea", byTarea, { nameLabel: "Tarea" });
-    renderTable("table-top-tareas", topTareasVolumen, { nameLabel: "Tarea" });
+    renderPesoList("top-tareas-list", topTareasPeso);
 
     renderRankBars("rank-promotor", byPromotor, 15, getPromotorTarget);
     renderRankBars("rank-supervisor", bySupervisor);
