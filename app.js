@@ -624,6 +624,90 @@
     });
   }
 
+  const LINE_PALETTE = ["#0ea5b8", "#d4930f", "#8b5cf6", "#16a34a", "#db2777", "#f97316",
+    "#2563eb", "#65a30d", "#e11d48", "#0891b2", "#7c3aed", "#ca8a04", "#059669", "#c026d3"];
+
+  function renderTendenciaChart(byPromotor) {
+    const svgEl = document.getElementById("tendencia-svg");
+    const legendEl = document.getElementById("tendencia-legend");
+    const diasTotal = CFG.SALES_DAYS_TOTAL, diasHoy = CFG.SALES_DAYS_ELAPSED;
+    document.getElementById("tendencia-subtitle").innerHTML =
+      "Proyección por regla de 3 simple: (validadas hoy &divide; días de venta transcurridos) &times; días de venta del mes. " +
+      "Hoy: día " + diasHoy + " de " + diasTotal + ".";
+
+    if (!diasTotal || !diasHoy || byPromotor.length === 0) {
+      svgEl.innerHTML = "";
+      legendEl.innerHTML = "";
+      return;
+    }
+
+    const lines = byPromotor.map((r, i) => {
+      const target = getPromotorTarget(r.name);
+      const ratePerDay = r.val / diasHoy;
+      const projectedVal = ratePerDay * diasTotal;
+      const projectedPct = r.cant > 0 ? projectedVal / r.cant : 0;
+      return {
+        name: r.name, color: LINE_PALETTE[i % LINE_PALETTE.length],
+        actualPct: r.pctVal, projectedPct, projectedVal, target
+      };
+    });
+
+    const targets = Array.from(new Set(lines.map(l => l.target))).sort((a, b) => a - b);
+    const maxY = Math.max(0.2, ...lines.map(l => l.projectedPct), ...targets) * 1.15;
+
+    const ML = 46, MR = 58, MT = 18, MB = 30, W = 900, H = 380;
+    const plotW = W - ML - MR, plotH = H - MT - MB;
+    const xScale = d => ML + (d / diasTotal) * plotW;
+    const yScale = p => MT + plotH - (Math.min(p, maxY) / maxY) * plotH;
+
+    let svg = "";
+
+    targets.forEach(t => {
+      const y = yScale(t);
+      svg += `<line x1="${ML}" y1="${y}" x2="${ML + plotW}" y2="${y}" stroke="#c7ccd6" stroke-width="1.2" stroke-dasharray="5,4"/>`;
+      svg += `<text x="${ML + plotW}" y="${y - 4}" text-anchor="end" font-size="10.5" font-weight="700" fill="#8b95a8">Objetivo ${fmtPct(t)}</text>`;
+    });
+
+    const hoyX = xScale(diasHoy);
+    svg += `<line x1="${hoyX}" y1="${MT}" x2="${hoyX}" y2="${MT + plotH}" stroke="#c7ccd6" stroke-width="1.2" stroke-dasharray="3,3"/>`;
+    svg += `<text x="${hoyX}" y="${MT - 5}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8b95a8">Hoy (día ${diasHoy})</text>`;
+
+    svg += `<line x1="${ML}" y1="${MT + plotH}" x2="${ML + plotW}" y2="${MT + plotH}" stroke="var(--border)" stroke-width="1.4"/>`;
+    svg += `<text x="${ML}" y="${H - 6}" font-size="10.5" fill="#8b95a8">Día 1</text>`;
+    svg += `<text x="${ML + plotW}" y="${H - 6}" text-anchor="end" font-size="10.5" fill="#8b95a8">Día ${diasTotal} (cierre)</text>`;
+
+    const labelPositions = lines.map(l => ({ y: yScale(l.projectedPct), l })).sort((a, b) => a.y - b.y);
+    const minGap = 13;
+    for (let i = 1; i < labelPositions.length; i++) {
+      if (labelPositions[i].y - labelPositions[i - 1].y < minGap) {
+        labelPositions[i].y = labelPositions[i - 1].y + minGap;
+      }
+    }
+
+    lines.forEach(l => {
+      const x0 = xScale(0), y0 = yScale(0);
+      const x1 = xScale(diasTotal), y1 = yScale(l.projectedPct);
+      const xToday = xScale(diasHoy), yToday = yScale(l.actualPct);
+      svg += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${l.color}" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>`;
+      svg += `<circle cx="${xToday}" cy="${yToday}" r="4" fill="${l.color}"/>`;
+    });
+
+    labelPositions.forEach(({ y, l }) => {
+      const trueY = yScale(l.projectedPct);
+      const x1 = xScale(diasTotal);
+      if (Math.abs(y - trueY) > 1) {
+        svg += `<line x1="${x1 + 3}" y1="${trueY}" x2="${x1 + 14}" y2="${y}" stroke="${l.color}" stroke-width="1"/>`;
+      }
+      svg += `<text x="${x1 + 16}" y="${y + 3.5}" font-size="11" font-weight="800" fill="${l.color}">${fmtPct(l.projectedPct)}</text>`;
+    });
+
+    svgEl.innerHTML = svg;
+
+    legendEl.innerHTML = lines.map(l =>
+      `<span class="tendencia-legend-item"><span class="tendencia-legend-dot" style="background:${l.color}"></span>${escapeHtml(l.name)} &middot; proyecta ${fmtInt(Math.round(l.projectedVal))} validadas</span>`
+    ).join("");
+  }
+
   function render() {
     const rows = getFiltered();
     renderKpis(rows);
@@ -656,6 +740,7 @@
     renderRankBars("rank-promotor", byPromotor, 15, getPromotorTarget);
     renderRankBars("rank-supervisor", bySupervisor);
     renderRankBars("rank-distribuidor", byDistribuidor);
+    renderTendenciaChart(byPromotor);
   }
 
   // ---------- Hoja de ruta del promotor ----------

@@ -35,5 +35,13 @@ window.DASHBOARD_CONFIG = {
   PROMOTOR_TARGET_DEFAULT: 0.45,
   PROMOTOR_TARGET_OVERRIDES: {
     "QUIROGA CRISTIAN": 0.55
-  }
+  },
+
+  // Calendario de dias de venta del mes, para la proyeccion de cierre de mes
+  // (regla de 3 simple). Regla: lunes a viernes = 1 dia, sabado = 0,5 dia,
+  // feriados nacionales = 0 dias. Actualiza estos 2 numeros a mano cada vez
+  // que corresponda (al empezar el mes con el total, y cada dia que pasa
+  // sumando segun la regla de arriba).
+  SALES_DAYS_TOTAL: 24,
+  SALES_DAYS_ELAPSED: 23
 };

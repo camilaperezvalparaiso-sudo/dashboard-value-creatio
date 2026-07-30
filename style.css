@@ -250,6 +250,12 @@ body {
 .panel-subtitle .hint { font-style: italic; opacity: .8; }
 .card h2 .hint { font-size: 11px; font-weight: 400; font-style: italic; color: var(--text-muted); }
 
+.tendencia-chart-wrap { width: 100%; }
+.tendencia-chart-wrap svg { width: 100%; height: auto; display: block; font-family: inherit; }
+.tendencia-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; }
+.tendencia-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text); font-weight: 600; }
+.tendencia-legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+
 .segment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
