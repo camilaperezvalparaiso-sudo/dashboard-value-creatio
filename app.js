@@ -640,7 +640,6 @@
 
   function renderTendenciaChart(byPromotor) {
     const svgEl = document.getElementById("tendencia-svg");
-    const legendEl = document.getElementById("tendencia-legend");
     const diasTotal = CFG.SALES_DAYS_TOTAL, diasHoy = CFG.SALES_DAYS_ELAPSED;
     document.getElementById("tendencia-subtitle").innerHTML =
       "Proyección por regla de 3 simple: (validadas hoy &divide; días de venta transcurridos) &times; días de venta del mes. " +
@@ -648,7 +647,6 @@
 
     if (!diasTotal || !diasHoy || byPromotor.length === 0) {
       svgEl.innerHTML = "";
-      legendEl.innerHTML = "";
       return;
     }
 
@@ -699,10 +697,6 @@
     });
 
     svgEl.innerHTML = svg;
-
-    legendEl.innerHTML = bars.map(l =>
-      `<span class="tendencia-legend-item"><span class="tendencia-legend-dot" style="background:${l.color}"></span>${escapeHtml(l.name)} &middot; proyecta ${fmtInt(Math.round(l.projectedVal))} validadas</span>`
-    ).join("");
   }
 
   function render() {
