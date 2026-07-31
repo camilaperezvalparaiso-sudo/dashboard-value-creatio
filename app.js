@@ -217,18 +217,20 @@
     return out;
   }
 
+  // "% Validadas + Pre" es un ACUMULADO (validadas oficiales + pre-validadas
+  // adicionales por compra real), no una metrica independiente. Por eso el
+  // denominador es el mismo que el de % Validada (todas las tareas), y el
+  // numerador suma las ya validadas mas las que, sin estar validadas todavia,
+  // el cliente ya compro el SKU que corresponde. Así "% Validadas + Pre" nunca
+  // puede ser menor que "% Validada".
   function applyPreValidacion(tasks, skuMap, purchaseMap) {
     tasks.forEach(t => {
       const validSkus = skuMap.get(normalizeText(t.tarea));
-      if (!validSkus || validSkus.size === 0) {
-        t.preValDenom = 0;
-        t.preValNum = 0;
-        return;
-      }
       const purchased = purchaseMap.get(t.clienteId);
-      const matched = !!purchased && Array.from(validSkus).some(sku => purchased.has(sku));
+      const matched = !!validSkus && validSkus.size > 0 && !!purchased &&
+        Array.from(validSkus).some(sku => purchased.has(sku));
       t.preValDenom = t.cant;
-      t.preValNum = matched ? t.cant : 0;
+      t.preValNum = (t.val === 1 || matched) ? t.cant : 0;
     });
   }
 
@@ -421,7 +423,7 @@
       preValNum = sumBy(rows, "preValNum"), preValDenom = sumBy(rows, "preValDenom");
     const cards = [
       { label: "% Validadas", value: fmtPct(pct(val, cant)) },
-      { label: "% Pre-validada (por SKU comprado)", value: fmtPct(pct(preValNum, preValDenom)) }
+      { label: "% Validadas + Pre", value: fmtPct(pct(preValNum, preValDenom)) }
     ];
     document.getElementById("kpis").innerHTML = cards.map(c =>
       `<div class="kpi-card"><div class="kpi-label">${c.label}</div><div class="kpi-value">${c.value}</div></div>`
@@ -480,7 +482,7 @@
     const shown = rows.slice(0, opts.limit || rows.length);
     const extraHeader = opts.extraColumn ? `<th>${opts.extraColumn.label}</th>` : "";
     let html = '<table class="rank-table"><thead><tr><th>#</th><th>' + (opts.nameLabel || "Nombre") +
-      '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Pre-validada</th>' + extraHeader + '</tr></thead><tbody>';
+      '</th><th>Tareas</th><th>Validadas</th><th>% Validada</th><th>% Validadas + Pre</th>' + extraHeader + '</tr></thead><tbody>';
     shown.forEach((r, i) => {
       const bg = opts.colorFn ? opts.colorFn(r) : colorForPct(r.pctVal);
       const preValCell = r.preValDenom > 0
