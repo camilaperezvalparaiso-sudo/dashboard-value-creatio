@@ -43,5 +43,5 @@ window.DASHBOARD_CONFIG = {
   // que corresponda (al empezar el mes con el total, y cada dia que pasa
   // sumando segun la regla de arriba).
   SALES_DAYS_TOTAL: 24,
-  SALES_DAYS_ELAPSED: 23
+  SALES_DAYS_ELAPSED: 24
 };
