@@ -627,11 +627,6 @@
   const LINE_PALETTE = ["#0ea5b8", "#d4930f", "#8b5cf6", "#16a34a", "#db2777", "#f97316",
     "#2563eb", "#65a30d", "#e11d48", "#0891b2", "#7c3aed", "#ca8a04", "#059669", "#c026d3"];
 
-  function hexTextColor(hex) {
-    const n = parseInt(hex.slice(1), 16);
-    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#1e293b" : "#ffffff";
-  }
   function truncateForHeight(name, availablePx) {
     const perChar = 6.4;
     const maxChars = Math.max(3, Math.floor(availablePx / perChar));
@@ -688,12 +683,11 @@
       const x = cx - barW / 2;
       const topY = yScale(bLine.projectedPct);
       const barH = baseY - topY;
-      const textColor = hexTextColor(bLine.color);
       const label = truncateForHeight(bLine.name, barH - 14);
 
       svg += `<rect x="${x}" y="${topY}" width="${barW}" height="${Math.max(2, barH)}" rx="6" fill="${bLine.color}"><title>${escapeHtml(bLine.name)}: proyecta ${fmtPct(bLine.projectedPct)} (${fmtInt(Math.round(bLine.projectedVal))} validadas) al día ${diasTotal}</title></rect>`;
       svg += `<text x="${cx}" y="${topY - 7}" text-anchor="middle" font-size="11" font-weight="800" fill="${bLine.color}">${fmtPct(bLine.projectedPct)}</text>`;
-      svg += `<text x="${cx + 4}" y="${baseY - 8}" text-anchor="start" font-size="10" font-weight="700" fill="${textColor}" transform="rotate(-90 ${cx + 4} ${baseY - 8})">${escapeHtml(label)}</text>`;
+      svg += `<text x="${cx + 4}" y="${baseY - 8}" text-anchor="start" font-size="10" font-weight="700" fill="#ffffff" transform="rotate(-90 ${cx + 4} ${baseY - 8})">${escapeHtml(label)}</text>`;
     });
 
     svgEl.innerHTML = svg;
