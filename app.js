@@ -779,9 +779,11 @@
 
     const clientes = CLIENTES.filter(c => sameTokens(c.personalComercial, promotor) && c.diasVisita.has(dia));
     const items = clientes.map(c => {
-      // "Pendiente" = todavia no validada (no alcanzo el objetivo/compra real), sin
-      // importar si el promotor la marco como completada en la visita.
-      const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.val === 0);
+      // "Pendiente" = todavia no validada Y todavia no pre-validada por una compra
+      // real (cruce con venta/SKU). Si el cliente ya compro el SKU que corresponde,
+      // la tarea se va a validar sola cuando el sistema la procese, asi que no tiene
+      // sentido mostrarla como algo que el promotor todavia tiene que conseguir.
+      const pendientes = DATA.filter(r => r.clienteId === c.clienteFull && r.val === 0 && r.preValNum === 0);
       return { c, tareas: pendientes.map(formatTareaPendiente) };
     }).filter(it => it.tareas.length > 0);
 
