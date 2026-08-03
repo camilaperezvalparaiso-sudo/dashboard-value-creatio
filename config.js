@@ -42,6 +42,7 @@ window.DASHBOARD_CONFIG = {
   // feriados nacionales = 0 dias. Actualiza estos 2 numeros a mano cada vez
   // que corresponda (al empezar el mes con el total, y cada dia que pasa
   // sumando segun la regla de arriba).
-  SALES_DAYS_TOTAL: 24,
-  SALES_DAYS_ELAPSED: 24
+  // Agosto 2026: 23 dias de venta en total. Unico feriado: 17 de agosto.
+  SALES_DAYS_TOTAL: 23,
+  SALES_DAYS_ELAPSED: 1.5
 };
